@@ -1,24 +1,22 @@
 #ifndef _MLIBC_RESOLV_CONF
 #define _MLIBC_RESOLV_CONF
 
-#include <frg/string.hpp>
-#include <frg/optional.hpp>
+#include <frg/vector.hpp>
 #include <mlibc/allocator.hpp>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 namespace mlibc {
 
-struct nameserver_data {
-	nameserver_data()
-	: name(getAllocator()) {}
-	nameserver_data(const char *name_, int af_)
-	: name(name_, getAllocator()), af(af_) {}
+	struct resolv_conf_nameserver {
+		int type; // AF_* types
+		union {
+			struct in_addr ipv4;
+			struct in6_addr ipv6;
+		};
+	};
 
-	frg::string<MemoryAllocator> name;
-	int af;
-	// for in the future we can also store options here
-};
-
-frg::optional<struct nameserver_data> get_nameserver(int idx);
+	frg::vector<struct resolv_conf_nameserver, MemoryAllocator> &resolv_conf_nameservers();
 
 } // namespace mlibc
 

@@ -1,4 +1,5 @@
 
+#include <mlibc/debug.hpp>
 #include <string.h>
 
 #include <bits/ensure.h>
@@ -25,6 +26,7 @@ MemoryAllocator &getAllocator() {
 
 uintptr_t VirtualAllocator::map(size_t length) {
 	void *ptr;
+	mlibc::infoLogger() << length << frg::endlog;
 	__ensure(!mlibc::sys_anon_allocate(length, &ptr));
 	return (uintptr_t)ptr;
 }
