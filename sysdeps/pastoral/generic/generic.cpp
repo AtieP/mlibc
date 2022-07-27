@@ -1,10 +1,13 @@
 #include <bits/ensure.h>
+#include <mlibc/allocator.hpp>
 #include <mlibc/debug.hpp>
 #include <mlibc/all-sysdeps.hpp>
 #include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <frg/vector.hpp>
+#include <sys/select.h>
 
 #define STUB_ONLY { __ensure(!"STUB_ONLY function was called"); __builtin_unreachable(); }
 
@@ -127,6 +130,20 @@
 #define TCSETSF 0x5304
 
 namespace mlibc {
+
+// TODO : remove this later. Mlibc seems to be broken about this.
+
+int _FD_ISSET(int fd, fd_set *set) {
+	__ensure(fd < FD_SETSIZE);
+	return set->__mlibc_elems[fd / 8] & (1 << (fd % 8));
+}
+void _FD_SET(int fd, fd_set *set) {
+	__ensure(fd < FD_SETSIZE);
+	set->__mlibc_elems[fd / 8] |= 1 << (fd % 8);
+}
+void _FD_ZERO(fd_set *set) {
+	memset(set->__mlibc_elems, 0, sizeof(fd_set));
+}
 
 void sys_libc_log(const char *message) {
 	int ret, errno;
@@ -452,7 +469,64 @@ int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat
 
 int sys_pselect(int num_fds, fd_set *read_set, fd_set *write_set, fd_set *except_set,
 		const struct timespec *timeout, const sigset_t *sigmask, int *num_events) {
-	mlibc::infoLogger() << "mlibc: " << __func__ << " is a stub!\n" << frg::endlog;
+	mlibc::infoLogger() << "mlibc: sys_pselect is a stub!" << frg::endlog;
+	return 0;
+
+	// Just pass the exact same stuff but in a ppoll format.
+	frg::vector<pollfd, MemoryAllocator> poll_data{getAllocator()};
+	for(int i = 0; i < num_fds; i++) {
+		struct pollfd poll_member = {};
+		poll_member.fd = i;
+		if(read_set) {
+			if(_FD_ISSET(i, read_set)) {
+				poll_member.events |= POLLIN;
+			}
+		}
+		if(write_set) {
+			if(_FD_ISSET(i, write_set)) {
+				poll_member.events |= POLLOUT;
+			}
+		}
+		if(except_set) {
+			if(_FD_ISSET(i, except_set)) {
+				poll_member.events |= POLLPRI;
+			}
+		}
+		if(poll_member.events != 0) {
+			poll_data.push(poll_member);
+		}
+	}
+
+	int num_events_p;
+	int ret = sys_ppoll(poll_data.data(), poll_data.size(),
+			timeout, sigmask, &num_events_p);
+	if(ret) {
+		return ret;
+	}
+
+	if(read_set) {
+		_FD_ZERO(read_set);
+	}
+	if(write_set) {
+		_FD_ZERO(write_set);
+	}
+	if(except_set) {
+		_FD_ZERO(except_set);
+	}
+
+	for(pollfd& item : poll_data) {
+		if(item.revents & POLLIN) {
+			_FD_SET(item.fd, read_set);
+		}
+		if(item.revents & POLLOUT) {
+			_FD_SET(item.fd, write_set);
+		}
+		if(item.revents & POLLPRI) {
+			_FD_SET(item.fd, except_set);
+		}
+	}
+
+	*num_events = num_events_p;
 	return 0;
 }
 
