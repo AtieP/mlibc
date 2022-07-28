@@ -123,6 +123,13 @@
 #define SYSCALL_SIGSUSPEND 52
 #define SYSCALL_POLL 53
 #define SYSCALL_PPOLL 54
+#define SYSCALL_SOCKET 55
+#define SYSCALL_GETSOCKNAME 56
+#define SYSCALL_GETPEERNAME 57
+#define SYSCALL_LISTEN 58
+#define SYSCALL_ACCEPT 69
+#define SYSCALL_BIND 60
+#define SYSCALL_CONNECT 61
 
 #define TCGETS 0x5401
 #define TCSETS 0x5402
@@ -143,6 +150,84 @@ void _FD_SET(int fd, fd_set *set) {
 }
 void _FD_ZERO(fd_set *set) {
 	memset(set->__mlibc_elems, 0, sizeof(fd_set));
+}
+
+int sys_socket(int family, int type, int protocol, int *fd) {
+	int ret, errno;
+
+	SYSCALL3(SYSCALL_SOCKET, family, type, protocol);
+	if(ret == -1)
+		return errno;
+
+	*fd = ret;
+
+	return 0;
+}
+
+int sys_accept(int fd, int *newfd, struct sockaddr *addr, socklen_t *addr_length) {
+	int ret, errno;
+
+	SYSCALL3(SYSCALL_ACCEPT, fd, addr, addr_length);
+	if(ret == -1)
+		return errno;
+	
+	*newfd = ret;
+
+	return 0;
+}
+
+int sys_sockname(int fd, struct sockaddr *addr, socklen_t max_addr_length, socklen_t *actual_length) {
+	int ret, errno;
+
+	SYSCALL3(SYSCALL_GETSOCKNAME, fd, addr, &max_addr_length);
+	if(ret == -1)
+		return errno;
+
+	*actual_length = max_addr_length;
+	
+	return 0;
+}
+
+int sys_peername(int fd, struct sockaddr *addr, socklen_t max_addr_length, socklen_t *actual_length) {
+	int ret, errno;
+
+	SYSCALL3(SYSCALL_GETPEERNAME, fd, addr, &max_addr_length);
+	if(ret == -1)
+		return errno;
+
+	*actual_length = max_addr_length;
+	
+	return 0;
+}
+
+int sys_listen(int fd, int backlog) {
+	int ret, errno;
+
+	SYSCALL2(SYSCALL_LISTEN, fd, backlog);
+	if(ret == -1)
+		return errno;
+
+	return 0;
+}
+
+int sys_bind(int fd, const struct sockaddr *addr, socklen_t addr_length) {
+	int ret, errno;
+
+	SYSCALL3(SYSCALL_BIND, fd, addr, addr_length); 
+	if(ret == -1)
+		return errno;
+	
+	return 0;
+}
+
+int sys_connect(int fd, const struct sockaddr *addr, socklen_t addr_length) {
+	int ret, errno;
+
+	SYSCALL3(SYSCALL_CONNECT, fd, addr, addr_length); 
+	if(ret == -1)
+		return errno;
+	
+	return 0;
 }
 
 void sys_libc_log(const char *message) {
